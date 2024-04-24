@@ -48,6 +48,75 @@ class LinkedList:
         else:
             raise TypeError("invalid argument type")
 
+    def __setitem__(
+        self: Self, key: int | slice, value: object | Iterable | LinkedList
+    ):
+        if isinstance(key, slice):
+            if not isinstance(value, Iterable):
+                raise TypeError(
+                    "invalid argument type, slice assignment only accepts iterables"
+                )
+            start = 0 if key.start is None else key.start
+            stop = len(self) if key.stop is None else key.stop
+            step = 1 if key.step is None else key.step
+            if step == 1:
+                del self[start:stop]
+                self.couple(
+                    value if isinstance(value, LinkedList) else LinkedList(value), start
+                )
+            elif step > 1:
+                slice_size = (stop - start) // step + 1 * ((stop - start) % step != 0)
+                if slice_size != len(value):
+                    raise ValueError(
+                        f"attempt to assign sequence of size {len(value)} to extended slice of size {slice_size}"
+                    )
+                step_count = 0
+                value_count = 0
+                for i in range(len(self)):
+                    if start <= i < stop:
+                        if step_count % step == 0:
+                            self[i] = value[value_count]
+                            value_count += 1
+                        step_count += 1
+                    elif i >= stop:
+                        break
+            else:
+                raise ValueError("negative steps are currently not supported")
+
+        elif isinstance(key, int):
+            self.get(key).data = value
+
+        else:
+            raise TypeError("invalid argument type")
+
+    # TODO optimize
+    def __delitem__(self: Self, key: int | slice) -> None:
+        if isinstance(key, slice):
+            start = 0 if key.start is None else key.start
+            stop = len(self) if key.stop is None else key.stop
+            step = 1 if key.step is None else key.step
+            if step == 1:
+                self.decouple(start, stop)
+            elif step > 1:
+                step_count = 0
+                deletion_count = 0
+                for i in range(len(self)):
+                    if start <= i < stop:
+                        if step_count % step == 0:
+                            self.pop(i - deletion_count)
+                            deletion_count += 1
+                        step_count += 1
+                    elif i >= stop:
+                        break
+            elif step < 0:
+                raise ValueError("negative steps are currently not supported")
+
+        elif isinstance(key, int):
+            self.pop(key)
+
+        else:
+            raise TypeError("invalid argument type")
+
     def __iter__(self: Self) -> Self:
         self.iter_node = self.head
         return self
@@ -65,33 +134,41 @@ class LinkedList:
     def __add__(self: Self, item: LinkedList) -> LinkedList:
         return self.copy().join(item)
 
-    # TODO: refactor
-    def insert(self: Self, data: object, position: int = None) -> Node:
-        if position == 0:
-            return self.insert_head(data)
-        if position == len(self) or position == None:
-            return self.insert_tail(data)
+    def __mul__(self: Self, value: int) -> LinkedList:
+        linked_list = LinkedList()
+        for _ in range(value):
+            linked_list += self
+        return linked_list
+
+    def get(self: Self, index: int):
+        if 0 <= index < len(self):
+            node = self.head
+            for _ in range(index):
+                node = node.next
+            return node
+        raise IndexError("linked list index out of range")
+
+    def insert(self: Self, data: object, position: int = None) -> None:
+        if position is None:
+            return self.append(data)
+        position += self.size if position < 0 else 0
+        if position == len(self):
+            return self.append(data)
         if position < 0 or position > len(self):
             raise IndexError("linked list index out of range")
         self.size += 1
         node = Node(data)
-        tnode = self.head
-        for _ in range(position - 1):
-            tnode = tnode.next
-        node.next = tnode.next
-        tnode.next = node
-        return node
+        if position == 0:
+            if not self.head:
+                self.head = self.tail = node
+            node.next = self.head
+            self.head = node
+        else:
+            prev = self.get(position - 1)
+            node.next = prev.next
+            prev.next = node
 
-    def insert_head(self: Self, data: object) -> Node:
-        self.size += 1
-        node = Node(data)
-        if not self.head:
-            self.head = self.tail = node
-        node.next = self.head
-        self.head = node
-        return node
-
-    def insert_tail(self: Self, data: object) -> Node:
+    def append(self: Self, data: object) -> None:
         self.size += 1
         node = Node(data)
         if not self.tail:
@@ -99,80 +176,124 @@ class LinkedList:
             return node
         self.tail.next = node
         self.tail = node
-        return node
-
-    def append(self: Self, data: object) -> None:
-        self.insert_tail(self, data)
 
     def extend(self: Self, iterable: Iterable) -> None:
-        for element in iterable:
-            self.insert_tail(element)
+        self.join(LinkedList(iterable))
 
     def join(self: Self, linked_list: LinkedList) -> LinkedList:
-        self.tail.next = linked_list.head
+        if self.head is None:
+            self.head = linked_list.head
+        else:
+            self.tail.next = linked_list.head
         self.tail = linked_list.tail
+        self.size += linked_list.size
         return self
 
-    # TODO: refactor
+    def couple(self: Self, linked_list: LinkedList, position: int) -> LinkedList:
+        if position == len(self):
+            return self.join(linked_list)
+        if position == 0:
+            linked_list.tail.next = self.head
+            self.head = linked_list.head
+        else:
+            node = self.get(position - 1)
+            linked_list.tail.next = node.next
+            node.next = linked_list.head
+        self.size += linked_list.size
+        return self
+
     def pop(self: Self, position: int = None) -> Node:
         if position is None:
             if len(self) <= 0:
                 raise TypeError("linked list is empty")
             position = len(self) - 1
-        if position == 0:
-            return self.pop_head()
+        position += self.size if position < 0 else 0
         if position < 0 or position >= len(self):
             raise IndexError("linked list index out of range")
         self.size -= 1
-        tnode = self.head
-        for _ in range(position - 1):
-            tnode = tnode.next
-        node = tnode.next
-        if position == len(self):
-            self.tail = tnode
-            tnode.next = None
+        if position == 0:
+            self.size -= 1
+            node = self.head
+            self.head = self.head.next
+            if len(self) == 0:
+                self.tail = None
         else:
-            tnode.next = tnode.next.next
+            prev = self.get(position - 1)
+            node = prev.next
+            if position == len(self):
+                self.tail = prev
+                prev.next = None
+            else:
+                prev.next = node.next
         return node
 
-    def pop_head(self: Self) -> Node:
-        self.size -= 1
-        node = self.head
-        self.head = self.head.next
-        if len(self) == 0:
+    def decouple(self, start: int = 0, stop: int = None) -> LinkedList:
+        if stop is None:
+            stop = len(self)
+        start += len(self) if start < 0 else 0
+        stop += len(self) if stop < 0 else 0
+        if start < 0 or stop < 0 or start >= len(self) or stop > len(self):
+            raise IndexError("index out of range")
+        if start > stop:
+            start, stop = stop, start
+        if stop - start == len(self):
+            self.head = None
             self.tail = None
-        return node
+            self.size = 0
+            return self
+        if start == 0:
+            self.head = self.get(stop - 1).next
+            if self.head.next is None:
+                self.tail = self.head
+        else:
+            node = self.get(start - 1)
+            node.next = self.get(stop - 1).next
+            if node.next is None:
+                self.tail = node
 
-    def pop_tail(self: Self) -> Node:
-        return self.pop(len(self) - 1)
+        self.size -= stop - start
+        return self
 
-    # TODO: Refactor + add step
-    def index(self: Self, data: object, start=0, stop=None, skip=0, nindices=None):
+    def index(
+        self: Self,
+        data: object | tuple,
+        start=0,
+        stop=None,
+        step=1,
+        skip=0,
+        nindices=None,
+        return_all=False,
+    ):
+        if step <= 0:
+            raise ValueError("negative steps are currently not supported")
+        start += len(self) if start < 0 else 0
+        start = 0 if start < 0 else start
         if nindices is None:
-            nindices = 1
+            nindices = len(self) if return_all else 1
         if stop is None:
             stop = len(self)
         if len(self) <= 0 or nindices <= 0:
             return None
+        if not isinstance(data, tuple):
+            data = [data]
         indices = []
-        tnode = self.head
-        i = 0
-        while tnode:
+        step_count = 0
+        for i, node_data in enumerate(self):
             if stop <= 0 or nindices <= 0:
                 break
-            if start <= 0 and tnode.data == data:
+            if start <= 0 and node_data in data:
                 if skip <= 0:
-                    indices.append(i)
-                    nindices -= 1
+                    if step_count % step == 0:
+                        indices.append(i)
+                        nindices -= 1
+                    step_count += 1
                 else:
                     skip -= 1
-            i += 1
-            tnode = tnode.next
             start -= 1
             stop -= 1
         if len(indices) <= 0:
             return None
         return indices if nindices > 0 or len(indices) > 1 else indices[0]
 
-    def copy(self):
+    def copy(self: Self):
         return LinkedList((data for data in self))
