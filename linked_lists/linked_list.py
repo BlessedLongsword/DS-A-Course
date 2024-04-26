@@ -15,7 +15,7 @@ class LinkedList:
         self.tail: Node = None
         if elements:
             for e in elements:
-                self.insert_tail(e)
+                self.append(e)
 
     def __len__(self: Self) -> int:
         return self.size
@@ -89,7 +89,6 @@ class LinkedList:
         else:
             raise TypeError("invalid argument type")
 
-    # TODO optimize
     def __delitem__(self: Self, key: int | slice) -> None:
         if isinstance(key, slice):
             start = 0 if key.start is None else key.start
@@ -99,15 +98,24 @@ class LinkedList:
                 self.decouple(start, stop)
             elif step > 1:
                 step_count = 0
-                deletion_count = 0
+                node, prev = None, None
                 for i in range(len(self)):
+                    node = self.head if node is None else node.next
                     if start <= i < stop:
                         if step_count % step == 0:
-                            self.pop(i - deletion_count)
-                            deletion_count += 1
+                            if node == self.head:
+                                self.head = node.next
+                                if node == self.tail:
+                                    self.tail = None
+                            else:
+                                prev.next = node.next
+                                if node == self.tail:
+                                    self.tail = prev
+                            self.size -= 1
                         step_count += 1
                     elif i >= stop:
                         break
+                    prev = node
             elif step < 0:
                 raise ValueError("negative steps are currently not supported")
 
@@ -139,6 +147,33 @@ class LinkedList:
         for _ in range(value):
             linked_list += self
         return linked_list
+
+    def __lt__(self, other):
+        for dataself, dataother in zip(self, other):
+            if dataself >= dataother:
+                return False
+        return True
+
+    def __gt__(self, other):
+        for dataself, dataother in zip(self, other):
+            if dataself <= dataother:
+                return False
+        return True
+
+    def __eq__(self, other):
+        for dataself, dataother in zip(self, other):
+            if dataself != dataother:
+                return False
+        return True
+
+    def __le__(self, other):
+        return not self.__gt__(other)
+
+    def __ge__(self, other):
+        return not self.__lt__(other)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def get(self: Self, index: int):
         if 0 <= index < len(self):
