@@ -8,7 +8,25 @@ class Node:
         self.next: Node = next
 
     def __str__(self: Self):
-        return str(self.data)
+        return str(f"Node({self.data})")
+
+    def __lt__(self: Self, other: Node) -> bool:
+        return self.data < other.data
+
+    def __gt__(self: Self, other: Node) -> bool:
+        return self.data > other.data
+
+    def __eq__(self: Self, other: Node) -> bool:
+        return self.data == other.data
+
+    def __le__(self: Self, other: Node) -> bool:
+        return self.data <= other.data
+
+    def __ge__(self: Self, other: Node) -> bool:
+        return self.data >= other.data
+
+    def __ne__(self: Self, other: Node) -> bool:
+        return self.data != other.data
 
 
 class LinkedList:
@@ -31,23 +49,23 @@ class LinkedList:
             step = 1 if key.step is None else key.step
             linked_list = type()
             step_count = 0
-            for i, data in enumerate(self):
+            for i, node in enumerate(self):
                 if start <= i < stop:
                     if step_count % step == 0:
-                        linked_list.insert(data)
+                        linked_list.insert(node.data)
                     step_count += 1
                 elif i >= stop:
                     break
             return linked_list
 
         elif isinstance(key, int):
-            return self.get(key).data
+            return self.get(key)
 
         else:
             raise TypeError("invalid argument type")
 
     def __setitem__(
-        self: Self, key: int | slice, value: object | Iterable | LinkedList
+        self: Self, key: int | slice, value: object | Node | Iterable | LinkedList
     ) -> None:
         if isinstance(key, slice):
             if not isinstance(value, Iterable):
@@ -82,7 +100,7 @@ class LinkedList:
                 raise ValueError("negative steps are currently not supported")
 
         elif isinstance(key, int):
-            self.get(key).data = value
+            self.get(key).data = value.data if isinstance(value, Node) else value
 
         else:
             raise TypeError("invalid argument type")
@@ -128,39 +146,40 @@ class LinkedList:
         return self
 
     def __next__(self: Self) -> Node:
-        if self.iter_node == None:
+        if self.iter_node is None:
             raise StopIteration
-        data = self.iter_node.data
+        node = self.iter_node
         self.iter_node = self.iter_node.next
-        return data
+        return node
 
     def __str__(self: Self) -> str:
-        return f"LinkedList{tuple([data for data in self])}"
+        return f"LinkedList{tuple([node.data for node in self])}"
 
     def __add__(self: Self, item: LinkedList) -> Self:
         return self.copy().join(item)
 
-    def __mul__(self: Self, value: int) -> Self:
-        linked_list = LinkedList()
+    def __mul__(self: Self, value: int, type: type = None) -> Self:
+        type = LinkedList if type is None else type
+        linked_list = type()
         for _ in range(value):
             linked_list += self
         return linked_list
 
     def __lt__(self, other) -> bool:
-        for dataself, dataother in zip(self, other):
-            if dataself >= dataother:
+        for node_self, node_other in zip(self, other):
+            if node_self >= node_other:
                 return False
         return True
 
     def __gt__(self, other) -> bool:
-        for dataself, dataother in zip(self, other):
-            if dataself <= dataother:
+        for node_self, node_other in zip(self, other):
+            if node_self <= node_other:
                 return False
         return True
 
     def __eq__(self, other) -> bool:
-        for dataself, dataother in zip(self, other):
-            if dataself != dataother:
+        for node_self, node_other in zip(self, other):
+            if node_self != node_other:
                 return False
         return True
 
@@ -311,10 +330,10 @@ class LinkedList:
             data = [data]
         indices = []
         step_count = 0
-        for i, node_data in enumerate(self):
+        for i, node in enumerate(self):
             if stop <= 0 or nindices <= 0:
                 break
-            if start <= 0 and node_data in data:
+            if start <= 0 and node.data in data:
                 if skip <= 0:
                     if step_count % step == 0:
                         indices.append(i)
@@ -330,6 +349,15 @@ class LinkedList:
 
     def copy(self: Self) -> LinkedList:
         return LinkedList((data for data in self))
+
+    def to_list(self: Self) -> list:
+        return [node.data for node in self]
+
+    def to_tuple(self: Self) -> tuple:
+        return tuple(node.data for node in self)
+
+    def to_set(self: Self) -> set:
+        return set(node.data for node in self)
 
 
 class CircularLinkedList(LinkedList):
@@ -367,13 +395,10 @@ class CircularLinkedList(LinkedList):
         return data
 
     def __str__(self: Self) -> str:
-        return f"CircularLinkedList{tuple([data for data in self])}"
+        return f"CircularLinkedList{tuple([node.data for node in self])}"
 
     def __mul__(self: Self, value: int) -> Self:
-        linked_list = CircularLinkedList()
-        for _ in range(value):
-            linked_list += self
-        return linked_list
+        return super().__mul__(value, CircularLinkedList)
 
     def get(self: Self, index: int) -> Node:
         return super().get(index % len(self))
@@ -498,10 +523,93 @@ class CircularLinkedList(LinkedList):
         return CircularLinkedList((data for data in self))
 
 
-class DNode:
+class DNode(Node):
     def __init__(
         self: Self, data: object, prev: DNode = None, next: DNode = None
     ) -> None:
-        self.data: object = data
-        self.prev: DNode = prev
-        self.next: DNode = next
+        super().__init__(data, next)
+        self.prev = prev
+
+    def __str__(self: Self):
+        return str(f"DNode({self.data})")
+
+
+class DoublyLinkedList(LinkedList):
+    def __init__(self: Self, elements: Iterable = None) -> None:
+        self.size: int = 0
+        self.head: DNode = None
+        self.tail: DNode = None
+        if elements:
+            for e in elements:
+                self.append(e)
+
+    def __str__(self: Self) -> str:
+        return f"DoublyLinkedList{tuple([node.data for node in self])}"
+
+    def __mul__(self: Self, value: int) -> None:
+        return super().__mul__(value, DoublyLinkedList)
+
+    def insert(self: Self, data: object, position: int = None) -> None:
+        if position is None:
+            return self.append(data)
+        position += self.size if position < 0 else 0
+        if position == len(self):
+            return self.append(data)
+        if position < 0 or position > len(self):
+            raise IndexError("linked list index out of range")
+        self.size += 1
+        node = DNode(data)
+        if position == 0:
+            if not self.head:
+                self.tail = node
+            else:
+                self.head.prev = node
+            node.next = self.head
+            self.head = node
+        else:
+            prev = self.get(position - 1)
+            node.prev, node.next = prev, prev.next
+            prev.next, node.next.prev = node, node
+
+    def append(self: Self, data: object) -> None:
+        self.size += 1
+        node = DNode(data, self.tail)
+        if node.prev:
+            node.prev.next = node
+        else:
+            self.head = node
+        self.tail = node
+
+    def join(self: Self, linked_list: LinkedList) -> Self:
+        linked_list = (
+            DoublyLinkedList(linked_list)
+            if not isinstance(linked_list, DoublyLinkedList)
+            else linked_list
+        )
+        if self.head is None:
+            self.head = linked_list.head
+        else:
+            linked_list.head.prev = self.tail
+            self.tail.next = linked_list.head
+        self.tail = linked_list.tail
+        self.size += linked_list.size
+        return self
+
+    def couple(self: Self, linked_list: LinkedList, position: int) -> Self:
+        if position == len(self):
+            return self.join(linked_list)
+        if position == 0:
+            self.head.prev = linked_list.tail
+            linked_list.tail.next = self.head
+            self.head = linked_list.head
+        else:
+            node = self.get(position - 1)
+            node.next.prev = linked_list.tail
+            linked_list.tail.next = node.next
+            linked_list.head.prev = node
+            node.next = linked_list.head
+        self.size += linked_list.size
+        return self
+
+    def copy(self: Self) -> DoublyLinkedList:
+        return DoublyLinkedList((data for data in self))
