@@ -23,12 +23,13 @@ class LinkedList:
     def __len__(self: Self) -> int:
         return self.size
 
-    def __getitem__(self: Self, key: int | slice) -> Self | object:
+    def __getitem__(self: Self, key: int | slice, type: type = None) -> Self | object:
+        type = LinkedList if type is None else type
         if isinstance(key, slice):
             start = 0 if key.start is None else key.start
             stop = len(self) if key.stop is None else key.stop
             step = 1 if key.step is None else key.step
-            linked_list = LinkedList()
+            linked_list = type()
             step_count = 0
             for i, data in enumerate(self):
                 if start <= i < stop:
@@ -40,13 +41,7 @@ class LinkedList:
             return linked_list
 
         elif isinstance(key, int):
-            if key < 0:
-                key += len(self)
-            if key < 0 or key >= len(self):
-                raise IndexError("index out of range")
-            for i, data in enumerate(self):
-                if i == key:
-                    return data
+            return self.get(key).data
 
         else:
             raise TypeError("invalid argument type")
@@ -179,6 +174,7 @@ class LinkedList:
         return not self.__eq__(other)
 
     def get(self: Self, index: int) -> Node:
+        index += len(self) if index < 0 else 0
         if 0 <= index < len(self):
             node = self.head
             for _ in range(index):
@@ -339,6 +335,23 @@ class LinkedList:
 class CircularLinkedList(LinkedList):
     def __init__(self: Self, elements: Iterable = None):
         super().__init__(elements)
+
+    def __getitem__(self: Self, key: int | slice) -> Self | object:
+        if isinstance(key, int):
+            return super().__getitem__(key % len(self), CircularLinkedList)
+        return super().__getitem__(key, CircularLinkedList)
+
+    def __setitem__(
+        self: Self, key: int | slice, value: object | Iterable | LinkedList
+    ) -> None:
+        if isinstance(key, int):
+            return super().__setitem__(key % len(self), value)
+        return super().__setitem__(key, value)
+
+    def __delitem__(self: Self, key: int | slice) -> None:
+        if isinstance(key, int):
+            return super().__delitem__(key % len(self))
+        return super().__delitem__(key)
 
     def __iter__(self: Self) -> Self:
         self.iter_node = self.head
