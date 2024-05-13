@@ -357,6 +357,41 @@ class LinkedList:
     def to_set(self: Self) -> set:
         return set(node.data for node in self)
 
+    def reverse(self: Self, start: int = 0, stop: int = None) -> None:
+        if stop is None:
+            stop = len(self)
+        start += len(self) if start < 0 else 0
+        stop += len(self) if stop < 0 else 0
+        if start < 0 or start > len(self) or stop < 0 or stop > len(self):
+            raise IndexError("linked list index out of range")
+        if stop - start < 2:
+            return
+        prev, node, next = None, self.head, None
+        prev_starter, starter = None, None
+        i = 0
+        while node:
+            if start <= i < stop:
+                starter = node if i == start and starter is None else starter
+                self.tail = node if stop == len(self) and i == start else self.tail
+                self.head = node if start == 0 and i == stop - 1 else self.head
+                next = node.next
+                node.next = prev
+                prev = node
+                node = next
+            else:
+                if i < start:
+                    prev_starter, prev = node, node
+                    node = node.next
+                elif i >= stop:
+                    break
+            i += 1
+
+        if prev_starter is not None:
+            prev_starter.next = prev
+
+        if starter is not None:
+            starter.next = node
+
 
 class CircularLinkedList(LinkedList):
     def __init__(self: Self, elements: Iterable = None):
@@ -460,6 +495,10 @@ class CircularLinkedList(LinkedList):
 
     def copy(self: Self) -> CircularLinkedList:
         return CircularLinkedList((data for data in self))
+
+    def reverse(self: Self, start: int = 0, stop: int = None) -> None:
+        super().reverse(start, stop)
+        self.tail.next = self.head
 
 
 class DNode(Node):
@@ -734,6 +773,45 @@ class DoublyLinkedList(LinkedList):
     def copy(self: Self) -> DoublyLinkedList:
         return DoublyLinkedList((data for data in self))
 
+    def reverse(self: Self, start: int = 0, stop: int = None) -> None:
+        if stop is None:
+            stop = len(self)
+        start += len(self) if start < 0 else 0
+        stop += len(self) if stop < 0 else 0
+        if start < 0 or start > len(self) or stop < 0 or stop > len(self):
+            raise IndexError("linked list index out of range")
+        if stop - start < 2:
+            return
+        node, last = self.head, self.tail
+        prev_starter, starter = None, None
+        i = 0
+        while node:
+            if start <= i < stop:
+                starter = node if i == start and starter is None else starter
+                self.tail = node if stop == len(self) and i == start else self.tail
+                self.head = node if start == 0 and i == stop - 1 else self.head
+                next = node.next
+                node.next, node.prev = node.prev, node.next
+                node = next
+            else:
+                if i < start:
+                    prev_starter, node = node, node.next
+                else:
+                    break
+            i += 1
+
+        if prev_starter is not None:
+            prev_starter.next = node.prev if node is not None else last
+            prev_starter.next.prev = prev_starter
+
+        if starter is not None:
+            starter.next = node
+
+        if node is not None:
+            node.prev = starter
+
+        self.head.prev = None
+
 
 class CircularDoublyLinkedList(DoublyLinkedList, CircularLinkedList):
     def __init__(self: Self, elements: Iterable = None) -> None:
@@ -831,3 +909,7 @@ class CircularDoublyLinkedList(DoublyLinkedList, CircularLinkedList):
 
     def copy(self: Self) -> CircularDoublyLinkedList:
         return CircularDoublyLinkedList((data for data in self))
+
+    def reverse(self: Self, start: int = 0, stop: int = None) -> None:
+        DoublyLinkedList.reverse(self, start, stop)
+        self.tail.next, self.head.prev = self.head, self.tail
